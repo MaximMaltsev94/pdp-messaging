@@ -1,6 +1,12 @@
 package pdp.messaging.producers.helloworldproducer;
 
-import javax.jms.*;
+import javax.jms.Connection;
+import javax.jms.ConnectionFactory;
+import javax.jms.Destination;
+import javax.jms.JMSException;
+import javax.jms.MessageProducer;
+import javax.jms.Session;
+import javax.jms.TextMessage;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -17,7 +23,6 @@ public class HelloWorldProducer {
     private static Context jndiCtx;
     private static ConnectionFactory connectionFactory;
     private static Destination destination;
-    private static MessageProducer producer;
 
     private static String DESTINATION_NAME = "helloqueue";
 
@@ -34,6 +39,8 @@ public class HelloWorldProducer {
             sendMessage(messageToSend);
         }
 
+        freeResources();
+
     }
 
     private static void initMessagingBeans() throws NamingException {
@@ -42,19 +49,30 @@ public class HelloWorldProducer {
         destination = (Destination) jndiCtx.lookup(DESTINATION_NAME);
     }
 
+    private static void freeResources() {
+        if(jndiCtx != null) {
+            try {
+                jndiCtx.close();
+            } catch (NamingException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     private static void sendMessage(String message) {
 
         Connection connection = null;
-        Session session = null;
         try {
             connection = connectionFactory.createConnection();
-            session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-            producer = session.createProducer(destination);
+            Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+            MessageProducer producer = session.createProducer(destination);
             TextMessage textMessage = session.createTextMessage(message);
             producer.send(textMessage);
         } catch (JMSException e) {
             if(connection != null) {
                 try {
+                    // From JavaEE documentation:
+                    // Closing a connection also closes its sessions and their message producers and message consumers.
                     connection.close();
                 } catch (JMSException ex) {
                     ex.printStackTrace();
